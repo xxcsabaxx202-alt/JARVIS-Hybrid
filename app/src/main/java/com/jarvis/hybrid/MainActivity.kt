@@ -114,7 +114,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
         })
-        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v1.1", 12f, Color.LTGRAY).apply {
+        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v1.3", 12f, Color.LTGRAY).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(5), 0, dp(28))
         })
@@ -190,6 +190,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         body.addView(button("◈  HELYI AI ÁLLAPOTA") { showLocalModelStatus() },
             LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
 
+        body.addView(button("◈  AI MÓD: HELYI / ONLINE") { chooseAiMode() },
+            LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
+
         body.addView(button("⚙  ONLINE AI BEÁLLÍTÁSA") { showAiSettings() },
             LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
 
@@ -240,6 +243,22 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             ?.hideSoftInputFromWindow(input.windowToken, 0)
         input.setText("")
         handle(command)
+    }
+
+    private fun chooseAiMode() {
+        val prefs = getSharedPreferences("jarvis_local_ai", MODE_PRIVATE)
+        val offline = prefs.getBoolean("offline_only", true)
+        AlertDialog.Builder(this).setTitle("JARVIS AI üzemmód")
+            .setSingleChoiceItems(arrayOf(
+                "Csak helyi AI (nincs külső AI-kérés)",
+                "Gemini online AI (internetet használ)"
+            ), if (offline) 0 else 1) { dialog, which ->
+                prefs.edit().putBoolean("offline_only", which == 0).apply()
+                dialog.dismiss()
+                reply(if (which == 0)
+                    "Helyi AI mód bekapcsolva. A natív llama.cpp motor még fejlesztés alatt."
+                else "Online Gemini mód bekapcsolva. Az AI-kérdések a Gemini szolgáltatásához kerülhetnek.")
+            }.setNegativeButton("Mégse", null).show()
     }
 
     private fun pickLocalModel() {
@@ -547,6 +566,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun askAi(question: String) {
+        if (getSharedPreferences("jarvis_local_ai", MODE_PRIVATE).getBoolean("offline_only", true)) {
+            reply("Helyi AI mód aktív. A GGUF modell importálása már elérhető, de a natív llama.cpp futtatómotor még nincs beépítve. A telefon nem küldi el a kérdésedet külső AI-nak.")
+            return
+        }
         if (!ai.hasKey()) {
             reply("Az online AI használatához először add meg a saját Gemini API-kulcsodat az AI beállításainál. Az offline parancsok addig is működnek.")
             return
