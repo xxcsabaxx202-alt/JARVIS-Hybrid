@@ -108,7 +108,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
         })
-        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v0.7", 12f, Color.LTGRAY).apply {
+        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v0.8", 12f, Color.LTGRAY).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(5), 0, dp(28))
         })
@@ -228,18 +228,32 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun showVoiceSettings() {
-        val labels = arrayOf("Imre magyar férfihang", "Beszédmotor beállítása", "Magyar hangok listája", "Természetes hangprofil", "Hang tesztelése")
+        val labels = arrayOf("HayaiTTS neurális hang beállítása", "Magyar férfihang kiválasztása", "Imre magyar férfihang", "Beszédmotor beállítása", "Magyar hangok listája", "Természetes hangprofil", "Hang tesztelése")
         AlertDialog.Builder(this)
             .setTitle("JARVIS hangprofil")
             .setItems(labels) { _, which ->
                 when (which) {
-                    0 -> selectImreVoice()
-                    1 -> openTtsSettings()
-                    2 -> chooseHungarianVoice()
-                    3 -> setVoice(1.0f, 0.92f)
+                    0 -> showHayaiSetup()
+                    1 -> chooseHungarianVoice()
+                    2 -> selectImreVoice()
+                    3 -> openTtsSettings()
+                    4 -> chooseHungarianVoice()
+                    5 -> setVoice(1.0f, 0.92f)
                     else -> reply("Üdvözöllek. JARVIS vagyok. Minden rendszer működésre kész.")
                 }
             }.show()
+    }
+
+    private fun showHayaiSetup() {
+        AlertDialog.Builder(this)
+            .setTitle("Ingyenes neurális hang Androidon")
+            .setMessage("1. Telepítsd a HayaiTTS alkalmazást a hivatalos GitHub Releases oldaláról.\n2. A HayaiTTS hangkatalógusában keress magyar (hu-HU) hangot, töltsd le és hallgasd meg. A magyar férfihang elérhetősége és hangminősége a katalógustól függ.\n3. A telefon Szövegfelolvasás beállításaiban válaszd ki a HayaiTTS beszédmotort.\n4. Térj vissza a JARVIS-ba, majd válaszd a Magyar férfihang kiválasztása menüt.\n\nA HayaiTTS offline működik, a hangmodell első letöltéséhez internet szükséges.")
+            .setPositiveButton("HayaiTTS kiadások") { _, _ ->
+                startActivity(Intent(Intent.ACTION_VIEW,
+                    Uri.parse("https://github.com/HayaiApp/HayaiTTS/releases")))
+            }
+            .setNeutralButton("Beszédmotor beállítása") { _, _ -> openTtsSettings() }
+            .setNegativeButton("Bezárás", null).show()
     }
 
     private fun openTtsSettings() {
