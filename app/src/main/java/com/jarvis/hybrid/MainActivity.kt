@@ -455,6 +455,50 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         dialog.show()
     }
 
+    private fun interpretAiAction(question: String, answer: String): Boolean {
+        val prefix = "JARVIS_ACTION:"
+        if (!answer.trim().startsWith(prefix)) return false
+        val raw = answer.trim().removePrefix(prefix).trim()
+        val parts = raw.split("|", limit = 2)
+        val action = parts.firstOrNull()?.trim().orEmpty()
+        val argument = parts.getOrNull(1)?.trim().orEmpty().take(180)
+        when (action) {
+            "BATTERY" -> reply(batteryReport())
+            "DIAGNOSTICS" -> showDiagnostics()
+            "SEARCH" -> {
+                if (argument.isBlank()) return false
+                confirmAiAction("Webes keresés", "Megnyissam a keresést erre: $argument?") {
+                    webSearch(argument)
+                }
+            }
+            "OPEN_SETTINGS" -> confirmAiAction("Beállítások", "Megnyissam a telefon beállításait?") {
+                openApp("beállítások")
+            }
+            "OPEN_CAMERA" -> confirmAiAction("Kamera", "Megnyissam a kamerát?") {
+                openApp("kamera")
+            }
+            "OPEN_MAPS" -> confirmAiAction("Térkép", "Megnyissam a térképet?") {
+                openApp("térkép")
+            }
+            "REMINDER" -> confirmAiAction("Emlékeztető", "Megnyissam a naptárat emlékeztető létrehozásához?") {
+                openReminder()
+            }
+            else -> return false
+        }
+        return true
+    }
+
+    private fun confirmAiAction(title: String, message: String, action: () -> Unit) {
+        hud.mode = "idle"
+        status.text = "● JÓVÁHAGYÁSRA VÁR"
+        AlertDialog.Builder(this).setTitle("JARVIS • " + title)
+            .setMessage(message)
+            .setPositiveButton("Engedélyezem") { _, _ -> action() }
+            .setNegativeButton("Mégse") { _, _ -> reply("Művelet megszakítva.") }
+            .setOnCancelListener { reply("Művelet megszakítva.") }
+            .show()
+    }
+
     private fun askAi(question: String) {
         if (!ai.hasKey()) {
             reply("Az online AI használatához először add meg a saját Gemini API-kulcsodat az AI beállításainál. Az offline parancsok addig is működnek.")
