@@ -22,6 +22,9 @@ import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.content.Context
+import android.content.IntentFilter
+import android.os.BatteryManager
+import android.os.Build
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -108,7 +111,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
         })
-        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v0.8", 12f, Color.LTGRAY).apply {
+        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v0.9", 12f, Color.LTGRAY).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(5), 0, dp(28))
         })
@@ -188,6 +191,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val shortcuts = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val options = listOf("🕒 Idő" to "Mennyi az idő?",
             "📅 Dátum" to "Mai dátum",
+            "🔋 Akku" to "Akkumulátor állapota",
             "📝 Memória" to "Beszélgetési előzmények")
         options.forEach { (title, command) ->
             shortcuts.addView(button(title) { handle(command) },
@@ -196,6 +200,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 })
         }
         body.addView(shortcuts)
+        body.addView(button("◈  RENDSZERDIAGNOSZTIKA") { showDiagnostics() },
+            LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
         body.addView(label("Példák: nyisd meg a beállításokat; tárcsázd: +36...; emlékeztess; beszélgetési előzmények; töröld a beszélgetést. Az automatikus újrahallgatás csak nyitott alkalmazásban működik.", 12f, Color.LTGRAY).apply {
             setPadding(0, dp(20), 0, 0)
         })
@@ -386,6 +392,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 memory.clear()
                 reply("A mentett AI-beszélgetést töröltem.")
             }
+            lower.contains("akkumulátor") || lower.contains("töltöttség") || lower.contains("akku") -> reply(batteryReport())
+            lower == "rendszerdiagnosztika" || lower == "rendszer állapota" || lower == "telefon állapota" -> showDiagnostics()
+            lower.startsWith("keress rá:") || lower.startsWith("keresés:") -> webSearch(command.substringAfter(":").trim())
             lower.startsWith("nyisd meg ") -> openApp(lower.removePrefix("nyisd meg ").trim())
             lower.startsWith("tárcsázd:") -> dial(command.substringAfter(":").trim())
             lower == "emlékeztess" || lower.startsWith("emlékeztető") -> openReminder()
@@ -467,6 +476,44 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     reply(answer)
                 }
             }
+        }
+    }
+
+    private fun batteryReport(): String {
+        val battery = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            ?: return "Az akkumulátor adatai most nem érhetők el."
+        val level = battery.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = battery.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        val percent = if (level >= 0 && scale > 0) level * 100 / scale else -1
+        val state = battery.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val charging = state == BatteryManager.BATTERY_STATUS_CHARGING ||
+            state == BatteryManager.BATTERY_STATUS_FULL
+        return "Akkumulátor: " + (if (percent >= 0) "$percent%" else "ismeretlen") +
+            ". Töltés: " + (if (charging) "igen." else "nem.")
+    }
+
+    private fun showDiagnostics() {
+        val report = "JARVIS RENDSZERDIAGNOSZTIKA\\n" +
+            batteryReport() + "\\n" +
+            "Eszköz: " + Build.MANUFACTURER + " " + Build.MODEL + "\\n" +
+            "Android: " + Build.VERSION.RELEASE + "\\n" +
+            "AI-kulcs: " + (if (ai.hasKey()) "beállítva" else "nincs beállítva") + "\\n" +
+            "Beszédmotor: " + (activeTtsEngine ?: "alapértelmezett")
+        reply(report.replace("\\n", "\n"))
+    }
+
+    private fun webSearch(query: String) {
+        if (query.isBlank()) {
+            reply("Mondd meg, mire keressek rá. Példa: keress rá: időjárás")
+            return
+        }
+        try {
+            val intent = Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://www.google.com/search?q=" + Uri.encode(query)))
+            startActivity(intent)
+            reply("Megnyitom a keresési találatokat: $query")
+        } catch (_: Exception) {
+            reply("Nem sikerült megnyitni a böngészőt.")
         }
     }
 
