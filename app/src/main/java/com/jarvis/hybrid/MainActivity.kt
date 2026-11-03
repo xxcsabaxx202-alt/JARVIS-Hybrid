@@ -114,7 +114,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
         })
-        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v1.3", 12f, Color.LTGRAY).apply {
+        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v2.0", 12f, Color.LTGRAY).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(5), 0, dp(28))
         })
@@ -220,8 +220,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         setContentView(screen)
     }
 
+    override fun onPause() {
+        if (::hud.isInitialized) hud.setForeground(false)
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
+        if (::hud.isInitialized) hud.setForeground(true)
         val selected = Settings.Secure.getString(contentResolver, "tts_default_synth")
         if (activeTtsEngine != null && selected != activeTtsEngine) {
             activeTtsEngine = selected
@@ -247,7 +253,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun chooseAiMode() {
         val prefs = getSharedPreferences("jarvis_local_ai", MODE_PRIVATE)
-        val offline = prefs.getBoolean("offline_only", true)
+        val offline = prefs.getBoolean("offline_only", false)
         AlertDialog.Builder(this).setTitle("JARVIS AI üzemmód")
             .setSingleChoiceItems(arrayOf(
                 "Csak helyi AI (nincs külső AI-kérés)",
