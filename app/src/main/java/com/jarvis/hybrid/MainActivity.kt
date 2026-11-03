@@ -3,6 +3,12 @@ package com.jarvis.hybrid
 import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
+import android.net.Uri
+import android.provider.CalendarContract
+import android.provider.Settings
+import android.speech.tts.UtteranceProgressListener
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -35,6 +41,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var ai: GeminiClient
+    private lateinit var memory: ConversationMemory
+    private var pulse: ObjectAnimator? = null
+    private var autoListen = false
     private var waitingForAi = false
     private val speechRequest = 101
     private val micRequest = 102
@@ -71,6 +80,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         window.navigationBarColor = dark
         tts = TextToSpeech(this, this)
         ai = GeminiClient(this)
+        memory = ConversationMemory(this)
 
         val screen = ScrollView(this).apply {
             setBackgroundColor(dark)
@@ -86,7 +96,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
         })
-        body.addView(label("HYBRID ASSISTANT  •  v0.3", 12f, Color.LTGRAY).apply {
+        body.addView(label("HYBRID ASSISTANT  •  v0.4", 12f, Color.LTGRAY).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(5), 0, dp(28))
         })
@@ -98,6 +108,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             contentDescription = "JARVIS vezérlőközpont"
         }
         body.addView(core, LinearLayout.LayoutParams(-1, dp(185)))
+        pulse = ObjectAnimator.ofFloat(core, View.ALPHA, 1f, 0.55f, 1f).apply {
+            duration = 1900L
+            repeatCount = ValueAnimator.INFINITE
+            start()
+        }
 
         status = label("● RENDSZER AKTÍV  •  ALAP PARANCSOK", 12f, cyan).apply {
             gravity = Gravity.CENTER
@@ -139,6 +154,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         body.addView(button("➤  PARANCS KÜLDÉSE") { handle(input.text.toString()) },
             LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
 
+        body.addView(button("🔁  BESZÉLGETŐ MÓD: KI/BE") {
+            autoListen = !autoListen
+            reply(if (autoListen) "Beszélgető mód bekapcsolva. A válasz után újra megnyitom a mikrofont. A leállításhoz nyomd meg újra a gombot." else "Beszélgető mód kikapcsolva.")
+        }, LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
+
         body.addView(button("⚙  ONLINE AI BEÁLLÍTÁSA") { showAiSettings() },
             LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
 
@@ -149,7 +169,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val shortcuts = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         val options = listOf("🕒 Idő" to "Mennyi az idő?",
             "📅 Dátum" to "Mai dátum",
-            "📝 Jegyzetek" to "Jegyzeteim")
+            "📝 Memória" to "Beszélgetési előzmények")
         options.forEach { (title, command) ->
             shortcuts.addView(button(title) { handle(command) },
                 LinearLayout.LayoutParams(0, dp(52), 1f).apply {
@@ -157,7 +177,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 })
         }
         body.addView(shortcuts)
-        body.addView(label("Az alap parancsok offline működnek. Az AI-hoz internet és saját Gemini API-kulcs kell. A beszédfelismerés a telefon szolgáltatásától függ.", 12f, Color.LTGRAY).apply {
+        body.addView(label("Példák: nyisd meg a beállításokat; tárcsázd: +36...; emlékeztess; beszélgetési előzmények; töröld a beszélgetést. Az automatikus újrahallgatás csak nyitott alkalmazásban működik.", 12f, Color.LTGRAY).apply {
             setPadding(0, dp(20), 0, 0)
         })
         setContentView(screen)
@@ -197,7 +217,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 input.setText(words)
                 handle(words)
             } else status.text = "● RENDSZER AKTÍV"
-        } else if (requestCode == speechRequest) status.text = "● RENDSZER AKTÍV"
+        } else if (requestCode == speechRequest) {
+            autoListen = false
+            status.text = "● RENDSZER AKTÍV"
+        }
     }
 
     private fun handle(raw: String) {
@@ -215,6 +238,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     reply("Megjegyeztem: $note")
                 }
             }
+            lower == "beszélgetési előzmények" || lower == "beszélgetés előzményei" ->
+                reply(memory.summary())
+            lower == "töröld a beszélgetést" || lower == "felejtsd el a beszélgetést" -> {
+                memory.clear()
+                reply("A mentett AI-beszélgetést töröltem.")
+            }
+            lower.startsWith("nyisd meg ") -> openApp(lower.removePrefix("nyisd meg ").trim())
+            lower.startsWith("tárcsázd:") -> dial(command.substringAfter(":").trim())
+            lower == "emlékeztess" || lower.startsWith("emlékeztető") -> openReminder()
             lower.contains("mit jegyeztél meg") || lower.contains("jegyzeteim") ->
                 reply(prefs.getString("notes", "")?.takeIf { it.isNotBlank() } ?: "Még nincs jegyzeted.")
             lower.contains("idő") || lower.contains("óra") ->
@@ -273,8 +305,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         output.text = "JARVIS gondolkodik..."
         status.text = "● ONLINE AI KÉRÉS"
         executor.execute {
+            var success = false
             val answer = try {
-                ai.ask(question)
+                val result = ai.ask(question, memory.messages())
+                success = true
+                result
             } catch (e: Exception) {
                 "Az online AI most nem elérhető. Ellenőrizd az internetet, a kulcsot és a kvótát. " +
                     (e.message ?: "").take(160)
@@ -282,23 +317,87 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             runOnUiThread {
                 if (!isFinishing && !isDestroyed) {
                     waitingForAi = false
+                    if (success) {
+                        memory.add("user", question)
+                        memory.add("model", answer)
+                    }
                     reply(answer)
                 }
             }
         }
     }
 
+    private fun openApp(name: String) {
+        val intent = when {
+            name.contains("beállítás") -> Intent(Settings.ACTION_SETTINGS)
+            name.contains("kamera") -> Intent("android.media.action.IMAGE_CAPTURE")
+            name.contains("böngésző") || name.contains("internet") ->
+                Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com"))
+            name.contains("térkép") -> Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q="))
+            else -> null
+        }
+        if (intent == null) {
+            reply("Ezt az alkalmazást még nem tudom megnyitni. Próbáld: beállítások, kamera, böngésző vagy térkép.")
+            return
+        }
+        try {
+            startActivity(intent)
+            reply("Megnyitom a kért alkalmazást.")
+        } catch (_: Exception) {
+            reply("Nem található a megfelelő alkalmazás.")
+        }
+    }
+
+    private fun dial(number: String) {
+        if (!number.matches(Regex("[+0-9 ()-]{3,25}"))) {
+            reply("Adj meg érvényes telefonszámot. Példa: tárcsázd: +3612345678")
+            return
+        }
+        try {
+            startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(number))))
+            reply("Megnyitottam a tárcsázót. A hívást neked kell elindítanod.")
+        } catch (_: Exception) {
+            reply("Nem sikerült megnyitni a tárcsázót.")
+        }
+    }
+
+    private fun openReminder() {
+        try {
+            val intent = Intent(Intent.ACTION_INSERT).apply {
+                data = CalendarContract.Events.CONTENT_URI
+                putExtra(CalendarContract.Events.TITLE, "JARVIS emlékeztető")
+            }
+            startActivity(intent)
+            reply("Megnyitottam a naptárat. Állítsd be az időpontot és mentsd az eseményt.")
+        } catch (_: Exception) {
+            reply("Nem található naptáralkalmazás az emlékeztető létrehozásához.")
+        }
+    }
+
     private fun reply(message: String) {
         output.text = message
         status.text = "● RENDSZER AKTÍV"
-        tts?.speak(message, TextToSpeech.QUEUE_FLUSH, null, "jarvis_response")
+        tts?.speak(message.take(2500), TextToSpeech.QUEUE_FLUSH, null, "jarvis_response")
     }
 
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) tts?.language = hu
+        if (status == TextToSpeech.SUCCESS) {
+            tts?.language = hu
+            tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                override fun onStart(utteranceId: String?) {}
+                override fun onDone(utteranceId: String?) {
+                    runOnUiThread {
+                        if (autoListen && !isFinishing && !isDestroyed) listen()
+                    }
+                }
+                override fun onError(utteranceId: String?) {}
+            })
+        }
     }
 
     override fun onDestroy() {
+        autoListen = false
+        pulse?.cancel()
         executor.shutdownNow()
         tts?.stop()
         tts?.shutdown()
