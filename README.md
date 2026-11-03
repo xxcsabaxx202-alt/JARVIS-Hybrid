@@ -1,4 +1,4 @@
-# JARVIS Hybrid v0.7
+# JARVIS Hybrid v0.8
 
 Natív Android asszisztens: helyi parancsok + választható online Gemini AI.
 
@@ -9,7 +9,14 @@ Natív Android asszisztens: helyi parancsok + választható online Gemini AI.
 - Sötét, futurisztikus kezelőfelület és gyorsgombok.
 - A kulcs Android Keystore AES-GCM titkosítással tárolódik a telefonon, nincs a GitHub forráskódban.
 
-## Új funkciók v0.7
+## Új funkciók v0.8
+- Ingyenes, Androidon helyben működő neurális TTS motor: **HayaiTTS**. A JARVIS hangbeállításában külön telepítési útmutató és hivatalos kiadási oldal található.
+- A HayaiTTS Android rendszerszintű beszédmotor, ezért a JARVIS meglévő TextToSpeech integrációjával használható. A beszédmotor kiválasztása után a JARVIS újrainicializálja a hangmotort.
+- A HayaiTTS hangkatalógusában kereshető és meghallgatható a magyar hang, de **természetes magyar férfihang rendelkezésre állása nem garantált**. A hivatalos modellkatalógust ellenőrizd telepítéskor.
+- A filmes HUD változatlan marad. A hangmodell első letöltéséhez internet szükséges; a beszéd utána offline is működhet.
+- Telepítés: https://github.com/HayaiApp/HayaiTTS/releases
+
+## Korábbi funkciók v0.7
 - Ingyenes magyar férfihang: **Magyar RHVoice Imre**. A hangmotor külön telepítendő a [Magyar RHVoice hangok](https://www.rhvoice.hu/hu/voices/) hivatalos oldaláról; nem része az APK-nak.
 - A telefon szövegfelolvasási beállításaiban válaszd ki az RHVoice motort, majd a JARVIS Hang beállítása menüben az **Imre magyar férfihang** opciót. Az alkalmazás felismeri az elérhető `Imre` nevű magyar hangot.
 - A beszédmotor módosítása után az alkalmazás újrainicializálja a TTS-t visszatéréskor.
