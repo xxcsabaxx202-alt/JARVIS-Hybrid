@@ -1,4 +1,4 @@
-# JARVIS Hybrid v0.6
+# JARVIS Hybrid v0.7
 
 Natív Android asszisztens: helyi parancsok + választható online Gemini AI.
 
@@ -9,7 +9,15 @@ Natív Android asszisztens: helyi parancsok + választható online Gemini AI.
 - Sötét, futurisztikus kezelőfelület és gyorsgombok.
 - A kulcs Android Keystore AES-GCM titkosítással tárolódik a telefonon, nincs a GitHub forráskódban.
 
-## Új funkciók v0.6
+## Új funkciók v0.7
+- Ingyenes magyar férfihang: **Magyar RHVoice Imre**. A hangmotor külön telepítendő a [Magyar RHVoice hangok](https://www.rhvoice.hu/hu/voices/) hivatalos oldaláról; nem része az APK-nak.
+- A telefon szövegfelolvasási beállításaiban válaszd ki az RHVoice motort, majd a JARVIS Hang beállítása menüben az **Imre magyar férfihang** opciót. Az alkalmazás felismeri az elérhető `Imre` nevű magyar hangot.
+- A beszédmotor módosítása után az alkalmazás újrainicializálja a TTS-t visszatéréskor.
+- A teljesen új, rétegezett holografikus HUD telemetria-rácsot, több gyűrűt, állapotfüggő színeket és animált hullámsávokat tartalmaz.
+- Nem szükséges fizetős beszéd API. Az RHVoice Android-alkalmazás és a hang telepítése külön felhasználói lépés.
+- Az Imre hang saját karakterű, **nem azonos a film eredeti szinkronhangjával**.
+
+## Korábbi funkciók v0.6
 - Magyar beszédhang kiválasztása a telefon telepített TTS-hangjai közül, magasabb minőségű helyi hangok előnyben részesítésével.
 - Mély filmes hangprofil és külön magyar hangválasztó a **JARVIS HANG BEÁLLÍTÁSA** menüben.
 - A holografikus vezérlőmag külön animációval jelzi a hallgatást, a gondolkodást és a beszédet.
