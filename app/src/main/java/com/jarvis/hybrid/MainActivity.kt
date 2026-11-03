@@ -515,7 +515,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         executor.execute {
             var success = false
             val answer = try {
-                val result = ai.ask(question, memory.messages())
+                val result = ai.ask("Ha a felhasználó egyértelműen az alábbi telefonos műveletek egyikét kéri, válaszolj KIZÁRÓLAG ebben a formában: JARVIS_ACTION:ACTION|argument. Engedélyezett ACTION: BATTERY, DIAGNOSTICS, SEARCH, OPEN_SETTINGS, OPEN_CAMERA, OPEN_MAPS, REMINDER. SEARCH esetén az argument legyen a keresőkifejezés, minden másnál üres. Ha nem egyértelműen végrehajtandó telefonos műveletet kér, válaszolj normál magyar szöveggel, JARVIS_ACTION nélkül. Ne javasolj más műveletet. Felhasználói kérés: " + question, memory.messages())
                 success = true
                 result
             } catch (e: Exception) {
@@ -529,7 +529,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                         memory.add("user", question)
                         memory.add("model", answer)
                     }
-                    reply(answer)
+                    if (!interpretAiAction(question, answer)) reply(answer)
                 }
             }
         }
