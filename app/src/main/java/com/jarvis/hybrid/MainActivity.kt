@@ -439,6 +439,20 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val command = raw.trim()
         val lower = command.lowercase(hu).trim().trimEnd('.', '!', '?')
         val prefs = getSharedPreferences("jarvis_notes", MODE_PRIVATE)
+        when (OfflineIntentEngine.classify(command)) {
+            OfflineIntentEngine.Intent.WEATHER_DEBRECEN -> { fetchDebrecenWeather(); return }
+            OfflineIntentEngine.Intent.TIME -> {
+                reply("Most " + SimpleDateFormat("HH:mm", hu).format(Date()) + " van.")
+                return
+            }
+            OfflineIntentEngine.Intent.DATE -> {
+                reply("Ma " + SimpleDateFormat("yyyy. MMMM d., EEEE", hu).format(Date()) + " van.")
+                return
+            }
+            OfflineIntentEngine.Intent.BATTERY -> { reply(batteryReport()); return }
+            OfflineIntentEngine.Intent.DIAGNOSTICS -> { showDiagnostics(); return }
+            OfflineIntentEngine.Intent.UNKNOWN -> Unit
+        }
         when {
             command.isBlank() -> reply("Írj be egy parancsot.")
             lower.startsWith("jegyezd meg:") -> {
@@ -478,10 +492,6 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             lower == "emlékeztess" || lower.startsWith("emlékeztető") -> openReminder()
             lower.contains("mit jegyeztél meg") || lower.contains("jegyzeteim") ->
                 reply(prefs.getString("notes", "")?.takeIf { it.isNotBlank() } ?: "Még nincs jegyzeted.")
-            lower.contains("idő") || lower.contains("óra") ->
-                reply("Most " + SimpleDateFormat("HH:mm", hu).format(Date()) + " van.")
-            lower.contains("dátum") || lower.contains("mai nap") ->
-                reply("Ma " + SimpleDateFormat("yyyy. MMMM d., EEEE", hu).format(Date()) + " van.")
             lower.contains("szia") || lower.contains("helló") ->
                 reply("Szia! JARVIS készen áll.")
             else -> askAi(command)
