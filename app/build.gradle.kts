@@ -9,8 +9,8 @@ android {
         applicationId = "com.jarvis.hybrid"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "1.4"
+        versionCode = 15
+        versionName = "2.0-alpha"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
