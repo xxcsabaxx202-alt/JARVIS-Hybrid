@@ -556,8 +556,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             return
         }
         try {
-            startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(number))))
-            reply("Megnyitottam a tárcsázót. A hívást neked kell elindítanod.")
+            AlertDialog.Builder(this).setTitle("Tárcsázó")
+                .setMessage("Megnyissam a tárcsázót ehhez a számhoz? " + number)
+                .setPositiveButton("Megnyitás") { _, _ ->
+                    try {
+                        startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(number))))
+                        reply("Megnyitottam a tárcsázót. A hívást neked kell elindítanod.")
+                    } catch (_: Exception) {
+                        reply("Nem sikerült megnyitni a tárcsázót.")
+                    }
+                }
+                .setNegativeButton("Mégse", null).show()
         } catch (_: Exception) {
             reply("Nem sikerült megnyitni a tárcsázót.")
         }
