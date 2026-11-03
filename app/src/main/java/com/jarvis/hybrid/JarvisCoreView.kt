@@ -12,10 +12,20 @@ class JarvisCoreView(context: Context) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cyan = Color.rgb(45, 225, 249)
     private var angle = 0f
+    var mode: String = "idle"
+        set(value) {
+            field = value
+            invalidate()
+        }
     private val tick = object : Runnable {
         override fun run() {
             if (!isAttachedToWindow) return
-            angle = (angle + 0.9f) % 360f
+            angle = (angle + when (mode) {
+                "listening" -> 2.2f
+                "thinking" -> 3.6f
+                "speaking" -> 1.8f
+                else -> 0.9f
+            }) % 360f
             invalidate()
             postDelayed(this, 32L)
         }
@@ -51,8 +61,12 @@ class JarvisCoreView(context: Context) : View(context) {
         canvas.drawCircle(cx, cy, r * 1.03f, paint)
         canvas.drawCircle(cx, cy, r * 0.76f, paint)
 
-        paint.color = cyan
-        paint.strokeWidth = 5f
+        paint.color = when (mode) {
+            "listening" -> Color.rgb(73, 255, 180)
+            "thinking" -> Color.rgb(255, 196, 85)
+            else -> cyan
+        }
+        paint.strokeWidth = if (mode == "speaking") 8f else 5f
         paint.setShadowLayer(12f, 0f, 0f, cyan)
         canvas.drawArc(cx-r, cy-r, cx+r, cy+r, angle, 105f, false, paint)
         canvas.drawArc(cx-r, cy-r, cx+r, cy+r, angle+180f, 75f, false, paint)
@@ -72,6 +86,15 @@ class JarvisCoreView(context: Context) : View(context) {
         paint.typeface = android.graphics.Typeface.create("sans-serif-light", android.graphics.Typeface.BOLD)
         paint.textSize = r * 0.31f
         canvas.drawText("J", cx, cy + r * 0.11f, paint)
+        paint.textSize = r * 0.115f
+        paint.typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.NORMAL)
+        val caption = when (mode) {
+            "listening" -> "HALLGATLAK"
+            "thinking" -> "FELDOLGOZÁS"
+            "speaking" -> "BESZÉLEK"
+            else -> "KÉSZENLÉT"
+        }
+        canvas.drawText(caption, cx, cy + r * 0.53f, paint)
 
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 1f
