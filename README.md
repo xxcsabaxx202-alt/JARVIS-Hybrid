@@ -1,4 +1,4 @@
-# JARVIS Hybrid v0.4
+# JARVIS Hybrid v0.6
 
 Natív Android asszisztens: helyi parancsok + választható online Gemini AI.
 
@@ -9,7 +9,13 @@ Natív Android asszisztens: helyi parancsok + választható online Gemini AI.
 - Sötét, futurisztikus kezelőfelület és gyorsgombok.
 - A kulcs Android Keystore AES-GCM titkosítással tárolódik a telefonon, nincs a GitHub forráskódban.
 
-## Új funkciók v0.4
+## Új funkciók v0.6
+- Magyar beszédhang kiválasztása a telefon telepített TTS-hangjai közül, magasabb minőségű helyi hangok előnyben részesítésével.
+- Mély filmes hangprofil és külön magyar hangválasztó a **JARVIS HANG BEÁLLÍTÁSA** menüben.
+- A holografikus vezérlőmag külön animációval jelzi a hallgatást, a gondolkodást és a beszédet.
+- Saját, filmszerű megjelenés; nem a film eredeti grafikájának vagy színészi hangjának pontos másolata.
+
+## Korábbi funkciók v0.4
 - **Beszélgetési memória:** az utolsó 12 felhasználói/AI-üzenet helyben tárolódik és a következő AI-kérdéshez elküldésre kerül. `Beszélgetési előzmények` megjeleníti; `Töröld a beszélgetést` eltávolítja. A Google a beszélgetési kontextust az AI-válaszhoz megkapja.
 - **Telefonvezérlés:** `Nyisd meg a beállításokat`, `Nyisd meg a kamerát`, `Nyisd meg a böngészőt`, `Nyisd meg a térképet`, `Tárcsázd: +3612345678`. A hívást a felhasználó indítja.
 - **Beszélgető mód:** a beszédhangos válasz után újra megnyitja a telefon beszédfelismerőjét, amíg a felhasználó ki nem kapcsolja. Csak nyitott alkalmazásban működik, nem ébresztőszavas háttérfigyelés.
