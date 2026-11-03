@@ -397,6 +397,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     }
                     .setNegativeButton("Mégse", null).show()
             }
+            (lower.contains("időjárás") || lower.contains("hány fok") || lower.contains("esni fog")) &&
+                lower.contains("debrecen") -> fetchDebrecenWeather()
             lower.contains("akkumulátor") || lower.contains("töltöttség") || lower.contains("akku") -> reply(batteryReport())
             lower == "rendszerdiagnosztika" || lower == "rendszer állapota" || lower == "telefon állapota" -> showDiagnostics()
             lower.startsWith("keress rá:") || lower.startsWith("keresés:") -> webSearch(command.substringAfter(":").trim())
@@ -533,6 +535,51 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     if (!handled) reply(answer)
                 }
             }
+        }
+    }
+
+    private fun fetchDebrecenWeather() {
+        output.text = "Lekérem Debrecen aktuális időjárását..."
+        status.text = "● IDŐJÁRÁSI ADATOK"
+        hud.mode = "thinking"
+        executor.execute {
+            val result = try {
+                val url = java.net.URL("https://api.open-meteo.com/v1/forecast?latitude=47.5316&longitude=21.6273&current=temperature_2m,relative_humidity_2m,precipitation,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Europe%2FBudapest&forecast_days=1")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                try {
+                    connection.connectTimeout = 10000
+                    connection.readTimeout = 10000
+                    if (connection.responseCode !in 200..299) throw IllegalStateException("Időjárási szerverhiba")
+                    val json = org.json.JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                    val current = json.getJSONObject("current")
+                    val daily = json.getJSONObject("daily")
+                    val code = current.optInt("weather_code", -1)
+                    val condition = when (code) {
+                        0 -> "derült"
+                        1, 2 -> "részben felhős"
+                        3 -> "borult"
+                        45, 48 -> "ködös"
+                        in 51..67 -> "csapadékos"
+                        in 71..77 -> "havas"
+                        in 80..82 -> "záporos"
+                        in 95..99 -> "zivataros"
+                        else -> "változékony"
+                    }
+                    val max = daily.getJSONArray("temperature_2m_max").optDouble(0)
+                    val min = daily.getJSONArray("temperature_2m_min").optDouble(0)
+                    val rain = daily.getJSONArray("precipitation_probability_max").optInt(0)
+                    "Debrecenben most " + current.optDouble("temperature_2m") +
+                        " Celsius-fok van, az idő " + condition +
+                        ". Ma várhatóan " + min + " és " + max +
+                        " fok között alakul a hőmérséklet. A csapadék valószínűsége legfeljebb " +
+                        rain + " százalék. Forrás: Open-Meteo."
+                } finally {
+                    connection.disconnect()
+                }
+            } catch (_: Exception) {
+                "Nem sikerült lekérni Debrecen időjárását. Ellenőrizd az internetkapcsolatot."
+            }
+            runOnUiThread { if (!isFinishing && !isDestroyed) reply(result) }
         }
     }
 
