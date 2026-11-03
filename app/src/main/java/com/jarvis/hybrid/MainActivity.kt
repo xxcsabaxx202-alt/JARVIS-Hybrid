@@ -402,6 +402,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             lower.startsWith("nyisd meg az ") -> openApp(lower.removePrefix("nyisd meg az ").trim())
             lower.startsWith("nyisd meg ") -> openApp(lower.removePrefix("nyisd meg ").trim())
             lower.startsWith("tárcsázd:") -> dial(command.substringAfter(":").trim())
+            lower.startsWith("tárcsázd ") -> dial(command.substringAfter("tárcsázd ").trim())
+            lower.startsWith("hívd fel ") -> dial(command.substringAfter("hívd fel ").trim())
             lower == "emlékeztess" || lower.startsWith("emlékeztető") -> openReminder()
             lower.contains("mit jegyeztél meg") || lower.contains("jegyzeteim") ->
                 reply(prefs.getString("notes", "")?.takeIf { it.isNotBlank() } ?: "Még nincs jegyzeted.")
