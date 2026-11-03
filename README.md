@@ -1,4 +1,4 @@
-# JARVIS Hybrid v0.3
+# JARVIS Hybrid v0.4
 
 Natív Android asszisztens: helyi parancsok + választható online Gemini AI.
 
@@ -8,6 +8,13 @@ Natív Android asszisztens: helyi parancsok + választható online Gemini AI.
 - Magyar beszédfelismerés a készülék szolgáltatásával (internetet igényelhet), magyar TTS ha támogatott.
 - Sötét, futurisztikus kezelőfelület és gyorsgombok.
 - A kulcs Android Keystore AES-GCM titkosítással tárolódik a telefonon, nincs a GitHub forráskódban.
+
+## Új funkciók v0.4
+- **Beszélgetési memória:** az utolsó 12 felhasználói/AI-üzenet helyben tárolódik és a következő AI-kérdéshez elküldésre kerül. `Beszélgetési előzmények` megjeleníti; `Töröld a beszélgetést` eltávolítja. A Google a beszélgetési kontextust az AI-válaszhoz megkapja.
+- **Telefonvezérlés:** `Nyisd meg a beállításokat`, `Nyisd meg a kamerát`, `Nyisd meg a böngészőt`, `Nyisd meg a térképet`, `Tárcsázd: +3612345678`. A hívást a felhasználó indítja.
+- **Beszélgető mód:** a beszédhangos válasz után újra megnyitja a telefon beszédfelismerőjét, amíg a felhasználó ki nem kapcsolja. Csak nyitott alkalmazásban működik, nem ébresztőszavas háttérfigyelés.
+- **Animált JARVIS-mag:** finom pulzáló vizuális visszajelzés.
+- **Emlékeztető:** az `Emlékeztess` parancs megnyitja a naptár eseménylétrehozó felületét, ahol a felhasználó beállítja az időpontot és menti az eseményt.
 
 ## Online AI aktiválása
 1. Telepítsd az új APK-t.
@@ -24,7 +31,7 @@ A sikeres **Build JARVIS APK** futásnál az **Artifacts** részben található 
 
 ## Jelenlegi korlátok
 - A beszédfelismerés nem garantáltan offline.
-- Nincs folyamatos háttérfigyelés vagy ébresztőszó.
+- Nincs folyamatos háttérfigyelés vagy ébresztőszó; a beszélgető mód a rendszer beszédfelismerő felületét indítja újra.
 - A Gemini kapcsolat kulcs és internet nélkül nem használható; az offline alapfunkciók ettől függetlenek.
-- Nincs többkörös AI-beszélgetés előzményküldéssel.
+- A beszélgetési memória legfeljebb 12 üzenetet őriz, egyszerű helyi tárolásban; nem titkosított napló. Ne adj meg érzékeny adatokat.
 - A debug APK nem Play Store kiadás.
