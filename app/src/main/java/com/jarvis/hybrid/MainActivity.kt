@@ -398,6 +398,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             lower.startsWith("keress rá ") -> webSearch(command.substringAfter("keress rá ").trim())
             lower.startsWith("keresd meg ") -> webSearch(command.substringAfter("keresd meg ").trim())
             lower.startsWith("keress ") -> webSearch(command.substringAfter("keress ").trim())
+            lower.startsWith("nyisd meg a ") -> openApp(lower.removePrefix("nyisd meg a ").trim())
+            lower.startsWith("nyisd meg az ") -> openApp(lower.removePrefix("nyisd meg az ").trim())
             lower.startsWith("nyisd meg ") -> openApp(lower.removePrefix("nyisd meg ").trim())
             lower.startsWith("tárcsázd:") -> dial(command.substringAfter(":").trim())
             lower == "emlékeztess" || lower.startsWith("emlékeztető") -> openReminder()
