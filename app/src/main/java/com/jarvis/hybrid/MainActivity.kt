@@ -111,7 +111,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
         })
-        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v1.0", 12f, Color.LTGRAY).apply {
+        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v1.1", 12f, Color.LTGRAY).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(5), 0, dp(28))
         })
@@ -525,11 +525,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             runOnUiThread {
                 if (!isFinishing && !isDestroyed) {
                     waitingForAi = false
-                    if (success) {
+                    val handled = if (success) interpretAiAction(question, answer) else false
+                    if (success && !handled) {
                         memory.add("user", question)
                         memory.add("model", answer)
                     }
-                    if (!interpretAiAction(question, answer)) reply(answer)
+                    if (!handled) reply(answer)
                 }
             }
         }
@@ -549,8 +550,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun showDiagnostics() {
-        val report = "JARVIS RENDSZERDIAGNOSZTIKA\\n" +
-            batteryReport() + "\\n" +
+        val report = "JARVIS RENDSZERDIAGNOSZTIKA\n" +
+            batteryReport() + "\n" +
             "Eszköz: " + Build.MANUFACTURER + " " + Build.MODEL + "\\n" +
             "Android: " + Build.VERSION.RELEASE + "\\n" +
             "AI-kulcs: " + (if (ai.hasKey()) "beállítva" else "nincs beállítva") + "\\n" +
