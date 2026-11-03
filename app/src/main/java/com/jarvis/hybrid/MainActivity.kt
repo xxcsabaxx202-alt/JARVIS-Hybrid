@@ -68,7 +68,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
         val screen = ScrollView(this).apply {
             setBackgroundColor(dark)
-            fillViewport = true
+            isFillViewport = true
         }
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
