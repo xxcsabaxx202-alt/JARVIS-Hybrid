@@ -552,9 +552,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun showDiagnostics() {
         val report = "JARVIS RENDSZERDIAGNOSZTIKA\n" +
             batteryReport() + "\n" +
-            "Eszköz: " + Build.MANUFACTURER + " " + Build.MODEL + "\\n" +
-            "Android: " + Build.VERSION.RELEASE + "\\n" +
-            "AI-kulcs: " + (if (ai.hasKey()) "beállítva" else "nincs beállítva") + "\\n" +
+            "Eszköz: " + Build.MANUFACTURER + " " + Build.MODEL + "\n" +
+            "Android: " + Build.VERSION.RELEASE + "\n" +
+            "AI-kulcs: " + (if (ai.hasKey()) "beállítva" else "nincs beállítva") + "\n" +
             "Beszédmotor: " + (activeTtsEngine ?: "alapértelmezett")
         reply(report)
     }
