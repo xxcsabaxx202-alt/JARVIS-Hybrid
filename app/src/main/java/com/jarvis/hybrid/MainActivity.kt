@@ -49,7 +49,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private lateinit var hud: JarvisCoreView
     private var pulse: ObjectAnimator? = null
     private var autoListen = false
-    private var voicePitch = 0.78f
+    private var voicePitch = 1.0f
+    private var activeTtsEngine: String? = null
     private var voiceRate = 0.91f
     private var waitingForAi = false
     private val speechRequest = 101
@@ -85,11 +86,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         super.onCreate(savedInstanceState)
         window.statusBarColor = dark
         window.navigationBarColor = dark
+        activeTtsEngine = Settings.Secure.getString(contentResolver, "tts_default_synth")
         tts = TextToSpeech(this, this)
         ai = GeminiClient(this)
         memory = ConversationMemory(this)
         val voicePrefs = getSharedPreferences("jarvis_voice", MODE_PRIVATE)
-        voicePitch = voicePrefs.getFloat("pitch", 0.78f)
+        voicePitch = voicePrefs.getFloat("pitch", 1.0f)
         voiceRate = voicePrefs.getFloat("rate", 0.91f)
 
         val screen = ScrollView(this).apply {
@@ -106,7 +108,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
         })
-        body.addView(label("HYBRID ASSISTANT  •  v0.6", 12f, Color.LTGRAY).apply {
+        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v0.7", 12f, Color.LTGRAY).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(5), 0, dp(28))
         })
@@ -114,7 +116,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         hud = JarvisCoreView(this).apply {
             background = rounded(panel, Color.rgb(24, 106, 128))
         }
-        body.addView(hud, LinearLayout.LayoutParams(-1, dp(240)))
+        body.addView(hud, LinearLayout.LayoutParams(-1, dp(340)))
         body.addView(label("◈  A R C   R E A C T O R   /   ONLINE", 11f, cyan).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(12), 0, dp(5))
@@ -200,6 +202,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         setContentView(screen)
     }
 
+    override fun onResume() {
+        super.onResume()
+        val selected = Settings.Secure.getString(contentResolver, "tts_default_synth")
+        if (activeTtsEngine != null && selected != activeTtsEngine) {
+            activeTtsEngine = selected
+            tts?.stop()
+            tts?.shutdown()
+            tts = TextToSpeech(this, this)
+        }
+    }
+
     private fun sendTypedCommand() {
         val command = input.text.toString().trim()
         if (command.isBlank()) {
@@ -215,18 +228,51 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun showVoiceSettings() {
-        val labels = arrayOf("Mély filmes hang", "Természetes hang", "Gépiesebb hang", "Magyar hang kiválasztása", "Hang tesztelése")
+        val labels = arrayOf("Imre magyar férfihang", "Beszédmotor beállítása", "Magyar hangok listája", "Természetes hangprofil", "Hang tesztelése")
         AlertDialog.Builder(this)
             .setTitle("JARVIS hangprofil")
             .setItems(labels) { _, which ->
                 when (which) {
-                    0 -> setVoice(0.70f, 0.88f)
-                    1 -> setVoice(1.0f, 1.0f)
-                    2 -> setVoice(0.80f, 0.82f)
-                    3 -> chooseHungarianVoice()
+                    0 -> selectImreVoice()
+                    1 -> openTtsSettings()
+                    2 -> chooseHungarianVoice()
+                    3 -> setVoice(1.0f, 0.92f)
                     else -> reply("Üdvözöllek. JARVIS vagyok. Minden rendszer működésre kész.")
                 }
             }.show()
+    }
+
+    private fun openTtsSettings() {
+        try {
+            startActivity(Intent("com.android.settings.TTS_SETTINGS"))
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_SETTINGS))
+                reply("A Beállításokban keresd: Szövegfelolvasás vagy Text-to-speech.")
+            } catch (_: Exception) {
+                reply("Nem sikerült megnyitni a beszédmotor beállításait.")
+            }
+        }
+    }
+
+    private fun selectImreVoice() {
+        val candidate = tts?.voices?.firstOrNull {
+            it.locale.language == "hu" && it.name.contains("imre", ignoreCase = true)
+        }
+        if (candidate == null) {
+            AlertDialog.Builder(this)
+                .setTitle("Imre magyar férfihang szükséges")
+                .setMessage("A telefon jelenlegi beszédmotorjában nincs Imre hang. Telepítsd a Magyar RHVoice Android-alkalmazást a rhvoice.hu/hu/voices/ oldalról, majd a telefon Szövegfelolvasás beállításainál válaszd ki az RHVoice beszédmotort. Térj vissza ide, és nyomd meg újra az Imre magyar férfihang gombot. A JARVIS nem állítja át automatikusan a telefon rendszerbeállításait.")
+                .setPositiveButton("Beszédmotor beállítása") { _, _ -> openTtsSettings() }
+                .setNegativeButton("Bezárás", null).show()
+            return
+        }
+        if (tts?.setVoice(candidate) == TextToSpeech.SUCCESS) {
+            getSharedPreferences("jarvis_voice", MODE_PRIVATE).edit()
+                .putString("voiceName", candidate.name).apply()
+            setVoice(1.0f, 0.92f)
+            reply("JARVIS jelentkezik. Imre magyar férfihang aktív.")
+        } else reply("Nem sikerült aktiválni az Imre hangot.")
     }
 
     private fun chooseHungarianVoice() {
@@ -461,7 +507,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         output.text = message
         status.text = "● RENDSZER AKTÍV"
         hud.mode = "speaking"
-        tts?.speak(message.take(2500), TextToSpeech.QUEUE_FLUSH, null, "jarvis_response")
+        if (tts?.speak(message.take(2500), TextToSpeech.QUEUE_FLUSH, null, "jarvis_response") != TextToSpeech.SUCCESS) {
+            hud.mode = "idle"
+        }
     }
 
     override fun onInit(status: Int) {
@@ -475,8 +523,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 tts?.voices?.firstOrNull { it.name == savedVoice && it.locale.language == "hu" }
                     ?.let { tts?.voice = it }
             } else {
-                tts?.voices?.filter { it.locale.language == "hu" && !it.isNetworkConnectionRequired }
-                    ?.maxByOrNull { it.quality }?.let { tts?.voice = it }
+                val hungarian = tts?.voices?.filter {
+                    it.locale.language == "hu" && !it.isNetworkConnectionRequired
+                }.orEmpty()
+                (hungarian.firstOrNull { it.name.contains("imre", ignoreCase = true) }
+                    ?: hungarian.maxByOrNull { it.quality })?.let { tts?.voice = it }
             }
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}
