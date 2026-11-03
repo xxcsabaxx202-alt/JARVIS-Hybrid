@@ -4,6 +4,9 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.LinearGradient
+import android.graphics.Shader
+import kotlin.math.sin
 import android.view.View
 import kotlin.math.min
 
@@ -52,14 +55,53 @@ class JarvisCoreView(context: Context) : View(context) {
         super.onDraw(canvas)
         val cx = width / 2f
         val cy = height / 2f
-        val r = min(width, height) * 0.40f
+        val r = min(width, height) * 0.33f
+        canvas.drawColor(Color.rgb(3, 12, 23))
         paint.style = Paint.Style.STROKE
         paint.strokeCap = Paint.Cap.ROUND
+        paint.strokeWidth = 1f
+        paint.color = Color.argb(27, 45, 225, 249)
+        val grid = width / 12f
+        for (i in 0..12) canvas.drawLine(i * grid, 0f, i * grid, height.toFloat(), paint)
+        for (i in 0..14) canvas.drawLine(0f, i * grid, width.toFloat(), i * grid, paint)
+        paint.color = Color.argb(100, 45, 225, 249)
+        canvas.drawLine(18f, 24f, width * 0.30f, 24f, paint)
+        canvas.drawLine(width * 0.70f, 24f, width - 18f, 24f, paint)
+        canvas.drawLine(18f, height - 24f, width * 0.30f, height - 24f, paint)
+        canvas.drawLine(width * 0.70f, height - 24f, width - 18f, height - 24f, paint)
+        paint.style = Paint.Style.FILL
+        paint.textAlign = Paint.Align.LEFT
+        paint.typeface = android.graphics.Typeface.create("monospace", android.graphics.Typeface.NORMAL)
+        paint.textSize = 12f * resources.displayMetrics.scaledDensity
+        paint.color = Color.rgb(72, 201, 226)
+        canvas.drawText("SYS // JARVIS", 20f, 49f, paint)
+        canvas.drawText("CORE STATUS", 20f, height - 45f, paint)
+        paint.textAlign = Paint.Align.RIGHT
+        canvas.drawText("HUD / 07", width - 20f, 49f, paint)
+        canvas.drawText("SECURE LINK", width - 20f, height - 45f, paint)
+        paint.style = Paint.Style.STROKE
 
         paint.color = Color.argb(40, 45, 225, 249)
         paint.strokeWidth = 2f
         canvas.drawCircle(cx, cy, r * 1.03f, paint)
         canvas.drawCircle(cx, cy, r * 0.76f, paint)
+        canvas.drawCircle(cx, cy, r * 1.23f, paint)
+        canvas.drawCircle(cx, cy, r * 1.33f, paint)
+        paint.strokeWidth = 2f
+        paint.color = Color.argb(120, 45, 225, 249)
+        for (i in 0 until 18) {
+            canvas.drawArc(cx-r*1.23f, cy-r*1.23f, cx+r*1.23f, cy+r*1.23f,
+                i*20f + angle*0.15f, 10f, false, paint)
+        }
+        paint.strokeWidth = 1f
+        for (i in 0 until 12) {
+            val y = cy - r * 0.66f + i * (r * 1.32f / 11f)
+            val pulse = (sin(angle * 0.05f + i * 0.7f) * 0.5f + 0.5f).toFloat()
+            val amplitude = if (mode == "speaking") 0.24f else 0.08f
+            paint.color = Color.argb((60 + pulse * 130).toInt(), 45, 225, 249)
+            canvas.drawLine(cx-r*1.62f, y, cx-r*(1.62f-amplitude*pulse), y, paint)
+            canvas.drawLine(cx+r*(1.62f-amplitude*pulse), y, cx+r*1.62f, y, paint)
+        }
 
         paint.color = when (mode) {
             "listening" -> Color.rgb(73, 255, 180)
