@@ -15,6 +15,15 @@ class JarvisCoreView(context: Context) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val cyan = Color.rgb(45, 225, 249)
     private var angle = 0f
+    var ecoMode: Boolean = true
+        set(value) { field = value; invalidate() }
+    private var isForeground = true
+
+    fun setForeground(active: Boolean) {
+        isForeground = active
+        removeCallbacks(tick)
+        if (active && isAttachedToWindow) post(tick)
+    }
     var mode: String = "idle"
         set(value) {
             field = value
@@ -22,7 +31,7 @@ class JarvisCoreView(context: Context) : View(context) {
         }
     private val tick = object : Runnable {
         override fun run() {
-            if (!isAttachedToWindow) return
+            if (!isAttachedToWindow || !isForeground) return
             angle = (angle + when (mode) {
                 "listening" -> 2.2f
                 "thinking" -> 3.6f
@@ -30,20 +39,20 @@ class JarvisCoreView(context: Context) : View(context) {
                 else -> 0.9f
             }) % 360f
             invalidate()
-            postDelayed(this, 32L)
+            postDelayed(this, if (ecoMode) 125L else 32L)
         }
     }
 
     init {
         contentDescription = "Animált JARVIS holografikus vezérlőmag"
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
-        setLayerType(LAYER_TYPE_SOFTWARE, null)
+        // Prefer hardware acceleration; avoid forcing CPU software rendering.
     }
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         removeCallbacks(tick)
-        post(tick)
+        if (isForeground) post(tick)
     }
 
     override fun onDetachedFromWindow() {
