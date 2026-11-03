@@ -60,8 +60,8 @@ class GeminiClient(private val context: Context) {
         return String(cipher.doFinal(Base64.decode(encrypted, Base64.NO_WRAP)), Charsets.UTF_8)
     }
 
-    /** Discover models available to this API key instead of relying on a retired hard-coded ID. */
-    private fun chooseModel(key: String): String {
+    /** List supported text-generation models for the user's key. */
+    private fun availableModels(key: String): List<String> {
         val connection = URL("https://generativelanguage.googleapis.com/v1beta/models?pageSize=100")
             .openConnection() as HttpURLConnection
         try {
@@ -86,15 +86,20 @@ class GeminiClient(private val context: Context) {
                 if (generates) {
                     val name = item.optString("name").removePrefix("models/")
                     if (name.startsWith("gemini-") && !name.contains("image") &&
-                        !name.contains("tts") && !name.contains("embedding")) available.add(name)
+                        !name.contains("tts") && !name.contains("embedding") &&
+                        !name.contains("robotics") && !name.contains("computer-use")) {
+                        available.add(name)
+                    }
                 }
             }
-            if (available.isEmpty()) throw IllegalStateException("Nincs elérhető Gemini szövegmodell ehhez a kulcshoz.")
-            val preferred = listOf("gemini-3.8-flash", "gemini-3-flash-preview",
-                "gemini-3-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash")
-            return preferred.firstOrNull { available.contains(it) }
-                ?: available.filter { it.contains("flash") }.sortedDescending().firstOrNull()
-                ?: available.first()
+            val preferred = listOf("gemini-2.5-flash-lite", "gemini-3-flash-preview",
+                "gemini-3.8-flash", "gemini-3-flash", "gemini-2.5-flash")
+            return available.distinct().sortedWith(
+                compareBy<String> { name ->
+                    val index = preferred.indexOf(name)
+                    if (index < 0) 100 else index
+                }.thenBy { it }
+            ).take(5)
         } finally {
             connection.disconnect()
         }
@@ -104,7 +109,35 @@ class GeminiClient(private val context: Context) {
     fun ask(question: String): String {
         val key = readKey()
         if (key.isBlank()) throw IllegalStateException("Nincs beállítva Gemini API-kulcs.")
-        val model = chooseModel(key)
+        val models = availableModels(key)
+        if (models.isEmpty()) throw IllegalStateException("Nincs elérhető Gemini szövegmodell.")
+        var lastError = "Ismeretlen hiba"
+        for (model in models) {
+            for (attempt in 0..1) {
+                try {
+                    return requestAnswer(key, model, question)
+                } catch (e: GeminiHttpException) {
+                    lastError = "Gemini HTTP ${e.status}: ${e.message.orEmpty().take(130)}"
+                    if (e.status == 429) {
+                        throw IllegalStateException("A Gemini-kvóta elfogyott vagy túl sok kérés érkezett. Próbáld később. " + lastError)
+                    }
+                    if (e.status == 401 || e.status == 403) {
+                        throw IllegalStateException("Ellenőrizd a Gemini API-kulcsot és a hozzáférést. " + lastError)
+                    }
+                    if (e.status != 503 && e.status != 502 && e.status != 500 && e.status != 404) {
+                        throw IllegalStateException(lastError)
+                    }
+                    if (attempt == 0 && e.status != 404) Thread.sleep(900L)
+                    if (e.status == 404) break
+                }
+            }
+        }
+        throw IllegalStateException("A Gemini-modellek átmenetileg nem válaszolnak. " + lastError)
+    }
+
+    private class GeminiHttpException(val status: Int, message: String) : Exception(message)
+
+    private fun requestAnswer(key: String, model: String, question: String): String {
         val connection = URL(
             "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
         ).openConnection() as HttpURLConnection
@@ -130,7 +163,7 @@ class GeminiClient(private val context: Context) {
                 val message = runCatching {
                     JSONObject(response).optJSONObject("error")?.optString("message")
                 }.getOrNull().orEmpty()
-                throw IllegalStateException("Gemini HTTP $status: " + message.take(180))
+                throw GeminiHttpException(status, message)
             }
             val candidates = JSONObject(response).optJSONArray("candidates")
             val parts = candidates?.optJSONObject(0)?.optJSONObject("content")?.optJSONArray("parts")
