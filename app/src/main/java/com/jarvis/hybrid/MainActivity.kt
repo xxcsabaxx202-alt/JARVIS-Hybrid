@@ -18,6 +18,10 @@ import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import android.view.Gravity
+import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.content.Context
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -44,6 +48,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private lateinit var memory: ConversationMemory
     private var pulse: ObjectAnimator? = null
     private var autoListen = false
+    private var voicePitch = 0.78f
+    private var voiceRate = 0.91f
     private var waitingForAi = false
     private val speechRequest = 101
     private val micRequest = 102
@@ -81,6 +87,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         tts = TextToSpeech(this, this)
         ai = GeminiClient(this)
         memory = ConversationMemory(this)
+        val voicePrefs = getSharedPreferences("jarvis_voice", MODE_PRIVATE)
+        voicePitch = voicePrefs.getFloat("pitch", 0.78f)
+        voiceRate = voicePrefs.getFloat("rate", 0.91f)
 
         val screen = ScrollView(this).apply {
             setBackgroundColor(dark)
@@ -96,23 +105,19 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
         })
-        body.addView(label("HYBRID ASSISTANT  •  v0.4", 12f, Color.LTGRAY).apply {
+        body.addView(label("HYBRID ASSISTANT  •  v0.5", 12f, Color.LTGRAY).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(5), 0, dp(28))
         })
 
-        val core = label("◉", 100f, cyan).apply {
+        val core = JarvisCoreView(this).apply {
+            background = rounded(panel, Color.rgb(24, 106, 128))
+        }
+        body.addView(core, LinearLayout.LayoutParams(-1, dp(240)))
+        body.addView(label("◈  A R C   R E A C T O R   /   ONLINE", 11f, cyan).apply {
             gravity = Gravity.CENTER
-            background = rounded(panel)
-            setPadding(0, dp(10), 0, dp(10))
-            contentDescription = "JARVIS vezérlőközpont"
-        }
-        body.addView(core, LinearLayout.LayoutParams(-1, dp(185)))
-        pulse = ObjectAnimator.ofFloat(core, View.ALPHA, 1f, 0.55f, 1f).apply {
-            duration = 1900L
-            repeatCount = ValueAnimator.INFINITE
-            start()
-        }
+            setPadding(0, dp(12), 0, dp(5))
+        })
 
         status = label("● RENDSZER AKTÍV  •  ALAP PARANCSOK", 12f, cyan).apply {
             gravity = Gravity.CENTER
@@ -142,7 +147,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             textSize = 16f
             background = rounded(panel, Color.rgb(38, 79, 100))
             setPadding(dp(14), dp(12), dp(14), dp(12))
-            setSingleLine(false)
+            setSingleLine(true)
+            imeOptions = EditorInfo.IME_ACTION_SEND
+            setOnEditorActionListener { _, actionId, event ->
+                if (actionId == EditorInfo.IME_ACTION_SEND ||
+                    (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)) {
+                    sendTypedCommand()
+                    true
+                } else false
+            }
         }
         body.addView(input, LinearLayout.LayoutParams(-1, -2).apply {
             topMargin = dp(20)
@@ -151,13 +164,16 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
         body.addView(button("🎙  BESZÉLJ JARVIS-HOZ") { listen() },
             LinearLayout.LayoutParams(-1, dp(56)))
-        body.addView(button("➤  PARANCS KÜLDÉSE") { handle(input.text.toString()) },
+        body.addView(button("➤  PARANCS KÜLDÉSE") { sendTypedCommand() },
             LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
 
         body.addView(button("🔁  BESZÉLGETŐ MÓD: KI/BE") {
             autoListen = !autoListen
             reply(if (autoListen) "Beszélgető mód bekapcsolva. A válasz után újra megnyitom a mikrofont. A leállításhoz nyomd meg újra a gombot." else "Beszélgető mód kikapcsolva.")
         }, LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
+
+        body.addView(button("🎚  JARVIS HANG BEÁLLÍTÁSA") { showVoiceSettings() },
+            LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
 
         body.addView(button("⚙  ONLINE AI BEÁLLÍTÁSA") { showAiSettings() },
             LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
@@ -181,6 +197,44 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(0, dp(20), 0, 0)
         })
         setContentView(screen)
+    }
+
+    private fun sendTypedCommand() {
+        val command = input.text.toString().trim()
+        if (command.isBlank()) {
+            reply("Írj be egy parancsot a küldés előtt.")
+            input.requestFocus()
+            return
+        }
+        input.clearFocus()
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)
+            ?.hideSoftInputFromWindow(input.windowToken, 0)
+        input.setText("")
+        handle(command)
+    }
+
+    private fun showVoiceSettings() {
+        val labels = arrayOf("Mély filmes hang", "Természetes hang", "Gépiesebb hang", "Hang tesztelése")
+        AlertDialog.Builder(this)
+            .setTitle("JARVIS hangprofil")
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> setVoice(0.70f, 0.88f)
+                    1 -> setVoice(1.0f, 1.0f)
+                    2 -> setVoice(0.80f, 0.82f)
+                    else -> reply("Üdvözöllek. JARVIS vagyok. Minden rendszer működésre kész.")
+                }
+            }.show()
+    }
+
+    private fun setVoice(pitch: Float, rate: Float) {
+        voicePitch = pitch
+        voiceRate = rate
+        getSharedPreferences("jarvis_voice", MODE_PRIVATE).edit()
+            .putFloat("pitch", pitch).putFloat("rate", rate).apply()
+        tts?.setPitch(pitch)
+        tts?.setSpeechRate(rate)
+        reply("Hangprofil beállítva. JARVIS készen áll.")
     }
 
     private fun listen() {
@@ -383,6 +437,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         if (status == TextToSpeech.SUCCESS) {
             tts?.language = hu
+            tts?.setPitch(voicePitch)
+            tts?.setSpeechRate(voiceRate)
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}
                 override fun onDone(utteranceId: String?) {
@@ -397,7 +453,6 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     override fun onDestroy() {
         autoListen = false
-        pulse?.cancel()
         executor.shutdownNow()
         tts?.stop()
         tts?.shutdown()
