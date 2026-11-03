@@ -60,12 +60,53 @@ class GeminiClient(private val context: Context) {
         return String(cipher.doFinal(Base64.decode(encrypted, Base64.NO_WRAP)), Charsets.UTF_8)
     }
 
+    /** Discover models available to this API key instead of relying on a retired hard-coded ID. */
+    private fun chooseModel(key: String): String {
+        val connection = URL("https://generativelanguage.googleapis.com/v1beta/models?pageSize=100")
+            .openConnection() as HttpURLConnection
+        try {
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+            connection.setRequestProperty("x-goog-api-key", key)
+            val code = connection.responseCode
+            val raw = (if (code in 200..299) connection.inputStream else connection.errorStream)
+                ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
+            if (code !in 200..299) throw IllegalStateException("Modelllista HTTP $code: " +
+                runCatching { JSONObject(raw).optJSONObject("error")?.optString("message") }
+                    .getOrNull().orEmpty().take(140))
+            val models = JSONObject(raw).optJSONArray("models") ?: JSONArray()
+            val available = mutableListOf<String>()
+            for (i in 0 until models.length()) {
+                val item = models.optJSONObject(i) ?: continue
+                val methods = item.optJSONArray("supportedGenerationMethods") ?: continue
+                var generates = false
+                for (j in 0 until methods.length()) {
+                    if (methods.optString(j) == "generateContent") generates = true
+                }
+                if (generates) {
+                    val name = item.optString("name").removePrefix("models/")
+                    if (name.startsWith("gemini-") && !name.contains("image") &&
+                        !name.contains("tts") && !name.contains("embedding")) available.add(name)
+                }
+            }
+            if (available.isEmpty()) throw IllegalStateException("Nincs elérhető Gemini szövegmodell ehhez a kulcshoz.")
+            val preferred = listOf("gemini-3.8-flash", "gemini-3-flash-preview",
+                "gemini-3-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash")
+            return preferred.firstOrNull { available.contains(it) }
+                ?: available.filter { it.contains("flash") }.sortedDescending().firstOrNull()
+                ?: available.first()
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     /** Must run off the Android main thread. */
     fun ask(question: String): String {
         val key = readKey()
         if (key.isBlank()) throw IllegalStateException("Nincs beállítva Gemini API-kulcs.")
+        val model = chooseModel(key)
         val connection = URL(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
         ).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "POST"
