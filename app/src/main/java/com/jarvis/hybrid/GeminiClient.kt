@@ -106,7 +106,7 @@ class GeminiClient(private val context: Context) {
     }
 
     /** Must run off the Android main thread. */
-    fun ask(question: String): String {
+    fun ask(question: String, history: JSONArray = JSONArray()): String {
         val key = readKey()
         if (key.isBlank()) throw IllegalStateException("Nincs beállítva Gemini API-kulcs.")
         val models = availableModels(key)
@@ -115,7 +115,7 @@ class GeminiClient(private val context: Context) {
         for (model in models) {
             for (attempt in 0..1) {
                 try {
-                    return requestAnswer(key, model, question)
+                    return requestAnswer(key, model, question, history)
                 } catch (e: GeminiHttpException) {
                     lastError = "Gemini HTTP ${e.status}: ${e.message.orEmpty().take(130)}"
                     if (e.status == 429) {
@@ -137,7 +137,23 @@ class GeminiClient(private val context: Context) {
 
     private class GeminiHttpException(val status: Int, message: String) : Exception(message)
 
-    private fun requestAnswer(key: String, model: String, question: String): String {
+    private fun buildContents(history: JSONArray, question: String): JSONArray {
+        val contents = JSONArray()
+        for (i in 0 until history.length()) {
+            val item = history.optJSONObject(i) ?: continue
+            val role = if (item.optString("role") == "model") "model" else "user"
+            val text = item.optString("text").take(4000)
+            if (text.isNotBlank()) {
+                contents.put(JSONObject().put("role", role)
+                    .put("parts", JSONArray().put(JSONObject().put("text", text))))
+            }
+        }
+        contents.put(JSONObject().put("role", "user")
+            .put("parts", JSONArray().put(JSONObject().put("text", question))))
+        return contents
+    }
+
+    private fun requestAnswer(key: String, model: String, question: String, history: JSONArray): String {
         val connection = URL(
             "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent"
         ).openConnection() as HttpURLConnection
@@ -152,9 +168,7 @@ class GeminiClient(private val context: Context) {
                 .put("systemInstruction", JSONObject().put("parts", JSONArray().put(
                     JSONObject().put("text", "JARVIS vagy, egy segítőkész magyar nyelvű Android-asszisztens. Válaszolj tömören magyarul. Ne állítsd, hogy hozzáférsz a telefon adataihoz vagy műveleteihez, ha nem tudsz.")
                 )))
-                .put("contents", JSONArray().put(JSONObject()
-                    .put("role", "user")
-                    .put("parts", JSONArray().put(JSONObject().put("text", question)))))
+                .put("contents", buildContents(history, question))
             connection.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) }
             val status = connection.responseCode
             val response = (if (status in 200..299) connection.inputStream else connection.errorStream)
