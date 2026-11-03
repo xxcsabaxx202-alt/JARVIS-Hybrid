@@ -111,7 +111,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
         })
-        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v0.9", 12f, Color.LTGRAY).apply {
+        body.addView(label("HOLOGRAPHIC ASSISTANT  •  v1.0", 12f, Color.LTGRAY).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(5), 0, dp(28))
         })
@@ -373,7 +373,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     private fun handle(raw: String) {
         val command = raw.trim()
-        val lower = command.lowercase(hu)
+        val lower = command.lowercase(hu).trim().trimEnd('.', '!', '?')
         val prefs = getSharedPreferences("jarvis_notes", MODE_PRIVATE)
         when {
             command.isBlank() -> reply("Írj be egy parancsot.")
