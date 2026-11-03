@@ -46,6 +46,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val executor = Executors.newSingleThreadExecutor()
     private lateinit var ai: GeminiClient
     private lateinit var memory: ConversationMemory
+    private lateinit var hud: JarvisCoreView
     private var pulse: ObjectAnimator? = null
     private var autoListen = false
     private var voicePitch = 0.78f
@@ -105,15 +106,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
         })
-        body.addView(label("HYBRID ASSISTANT  •  v0.5", 12f, Color.LTGRAY).apply {
+        body.addView(label("HYBRID ASSISTANT  •  v0.6", 12f, Color.LTGRAY).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(5), 0, dp(28))
         })
 
-        val core = JarvisCoreView(this).apply {
+        hud = JarvisCoreView(this).apply {
             background = rounded(panel, Color.rgb(24, 106, 128))
         }
-        body.addView(core, LinearLayout.LayoutParams(-1, dp(240)))
+        body.addView(hud, LinearLayout.LayoutParams(-1, dp(240)))
         body.addView(label("◈  A R C   R E A C T O R   /   ONLINE", 11f, cyan).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(12), 0, dp(5))
@@ -214,7 +215,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun showVoiceSettings() {
-        val labels = arrayOf("Mély filmes hang", "Természetes hang", "Gépiesebb hang", "Hang tesztelése")
+        val labels = arrayOf("Mély filmes hang", "Természetes hang", "Gépiesebb hang", "Magyar hang kiválasztása", "Hang tesztelése")
         AlertDialog.Builder(this)
             .setTitle("JARVIS hangprofil")
             .setItems(labels) { _, which ->
@@ -222,8 +223,33 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     0 -> setVoice(0.70f, 0.88f)
                     1 -> setVoice(1.0f, 1.0f)
                     2 -> setVoice(0.80f, 0.82f)
+                    3 -> chooseHungarianVoice()
                     else -> reply("Üdvözöllek. JARVIS vagyok. Minden rendszer működésre kész.")
                 }
+            }.show()
+    }
+
+    private fun chooseHungarianVoice() {
+        val voices = tts?.voices?.filter {
+            it.locale.language == "hu" && !it.isNetworkConnectionRequired
+        }?.sortedWith(compareBy({ it.quality }, { it.name }))?.reversed().orEmpty()
+        if (voices.isEmpty()) {
+            reply("A beszédmotor nem kínál telepített magyar hangot. Ellenőrizd a telefon szövegfelolvasási beállításait.")
+            return
+        }
+        val names = voices.map { voice ->
+            voice.name + if (voice.quality >= android.speech.tts.Voice.QUALITY_HIGH) " ★" else ""
+        }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle("Magyar beszédhang kiválasztása")
+            .setItems(names) { _, which ->
+                val voice = voices[which]
+                val applied = tts?.setVoice(voice) == TextToSpeech.SUCCESS
+                if (applied) {
+                    getSharedPreferences("jarvis_voice", MODE_PRIVATE).edit()
+                        .putString("voiceName", voice.name).apply()
+                    reply("A magyar hang kiválasztva. JARVIS jelentkezik.")
+                } else reply("Ezt a hangot nem sikerült aktiválni.")
             }.show()
     }
 
@@ -244,6 +270,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
         try {
             status.text = "● HALLGATLAK..."
+            hud.mode = "listening"
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hu-HU")
@@ -272,6 +299,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 handle(words)
             } else status.text = "● RENDSZER AKTÍV"
         } else if (requestCode == speechRequest) {
+            hud.mode = "idle"
             autoListen = false
             status.text = "● RENDSZER AKTÍV"
         }
@@ -357,6 +385,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
         waitingForAi = true
         output.text = "JARVIS gondolkodik..."
+        hud.mode = "thinking"
         status.text = "● ONLINE AI KÉRÉS"
         executor.execute {
             var success = false
@@ -431,6 +460,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun reply(message: String) {
         output.text = message
         status.text = "● RENDSZER AKTÍV"
+        hud.mode = "speaking"
         tts?.speak(message.take(2500), TextToSpeech.QUEUE_FLUSH, null, "jarvis_response")
     }
 
@@ -439,14 +469,28 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             tts?.language = hu
             tts?.setPitch(voicePitch)
             tts?.setSpeechRate(voiceRate)
+            val savedVoice = getSharedPreferences("jarvis_voice", MODE_PRIVATE)
+                .getString("voiceName", null)
+            if (savedVoice != null) {
+                tts?.voices?.firstOrNull { it.name == savedVoice && it.locale.language == "hu" }
+                    ?.let { tts?.voice = it }
+            } else {
+                tts?.voices?.filter { it.locale.language == "hu" && !it.isNetworkConnectionRequired }
+                    ?.maxByOrNull { it.quality }?.let { tts?.voice = it }
+            }
             tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                 override fun onStart(utteranceId: String?) {}
                 override fun onDone(utteranceId: String?) {
                     runOnUiThread {
-                        if (autoListen && !isFinishing && !isDestroyed) listen()
+                        if (!isFinishing && !isDestroyed) {
+                            hud.mode = "idle"
+                            if (autoListen) listen()
+                        }
                     }
                 }
-                override fun onError(utteranceId: String?) {}
+                override fun onError(utteranceId: String?) {
+                    runOnUiThread { if (!isFinishing && !isDestroyed) hud.mode = "idle" }
+                }
             })
         }
     }
