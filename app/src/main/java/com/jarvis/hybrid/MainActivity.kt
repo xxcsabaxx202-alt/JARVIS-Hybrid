@@ -47,6 +47,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private lateinit var status: TextView
     private var tts: TextToSpeech? = null
     private val executor = Executors.newSingleThreadExecutor()
+    private lateinit var localModel: LocalModelManager
     private lateinit var ai: GeminiClient
     private lateinit var memory: ConversationMemory
     private lateinit var hud: JarvisCoreView
@@ -56,6 +57,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var activeTtsEngine: String? = null
     private var voiceRate = 0.91f
     private var waitingForAi = false
+    private val modelPickerRequest = 103
     private val speechRequest = 101
     private val micRequest = 102
 
@@ -92,6 +94,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         activeTtsEngine = Settings.Secure.getString(contentResolver, "tts_default_synth")
         tts = TextToSpeech(this, this)
         ai = GeminiClient(this)
+        localModel = LocalModelManager(this)
         memory = ConversationMemory(this)
         val voicePrefs = getSharedPreferences("jarvis_voice", MODE_PRIVATE)
         voicePitch = voicePrefs.getFloat("pitch", 1.0f)
@@ -181,6 +184,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         body.addView(button("🎚  JARVIS HANG BEÁLLÍTÁSA") { showVoiceSettings() },
             LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
 
+        body.addView(button("◈  HELYI AI MODELL (GGUF) IMPORTÁLÁSA") { pickLocalModel() },
+            LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
+
+        body.addView(button("◈  HELYI AI ÁLLAPOTA") { showLocalModelStatus() },
+            LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
+
         body.addView(button("⚙  ONLINE AI BEÁLLÍTÁSA") { showAiSettings() },
             LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
 
@@ -231,6 +240,25 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             ?.hideSoftInputFromWindow(input.windowToken, 0)
         input.setText("")
         handle(command)
+    }
+
+    private fun pickLocalModel() {
+        AlertDialog.Builder(this).setTitle("Helyi llama.cpp modell")
+            .setMessage("Válassz egy saját GGUF modellt. A fájl a telefon alkalmazáson belüli tárhelyére kerül. Ez az első integrációs szakasz: a modell futtatásához még szükséges a natív llama.cpp motor. Nagy modellek több gigabájt tárhelyet igényelhetnek.")
+            .setPositiveButton("GGUF kiválasztása") { _, _ ->
+                val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "*/*"
+                }
+                startActivityForResult(intent, modelPickerRequest)
+            }.setNegativeButton("Mégse", null).show()
+    }
+
+    private fun showLocalModelStatus() {
+        reply(if (localModel.isInstalled())
+            "Helyi GGUF modell importálva: " + localModel.sizeMb() +
+                " MB. A natív llama.cpp futtatómotor még nincs bekapcsolva."
+        else "Még nincs GGUF modell importálva. A natív llama.cpp futtatómotor még nincs bekapcsolva.")
     }
 
     private fun showVoiceSettings() {
@@ -358,6 +386,23 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == modelPickerRequest) {
+            val uri = if (resultCode == RESULT_OK) data?.data else null
+            if (uri != null) {
+                output.text = "GGUF modell másolása a telefonra..."
+                status.text = "● HELYI MODELL IMPORTÁLÁSA"
+                executor.execute {
+                    val result = try {
+                        "GGUF modell importálva: " + localModel.importModel(uri) +
+                            " MB. A natív llama.cpp futtatómotor még nincs bekapcsolva."
+                    } catch (e: Exception) {
+                        "Modellimportálási hiba: " + (e.message ?: "ismeretlen hiba")
+                    }
+                    runOnUiThread { if (!isFinishing && !isDestroyed) reply(result) }
+                }
+            }
+            return
+        }
         if (requestCode == speechRequest && resultCode == RESULT_OK) {
             val words = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
             if (!words.isNullOrBlank()) {
