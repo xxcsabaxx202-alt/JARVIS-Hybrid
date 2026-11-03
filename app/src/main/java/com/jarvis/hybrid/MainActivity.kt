@@ -2,6 +2,7 @@ package com.jarvis.hybrid
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
@@ -20,6 +21,7 @@ import android.widget.TextView
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 @Suppress("DEPRECATION")
 class MainActivity : Activity(), TextToSpeech.OnInitListener {
@@ -31,6 +33,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private lateinit var input: EditText
     private lateinit var status: TextView
     private var tts: TextToSpeech? = null
+    private val executor = Executors.newSingleThreadExecutor()
+    private lateinit var ai: GeminiClient
+    private var waitingForAi = false
     private val speechRequest = 101
     private val micRequest = 102
 
@@ -65,6 +70,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         window.statusBarColor = dark
         window.navigationBarColor = dark
         tts = TextToSpeech(this, this)
+        ai = GeminiClient(this)
 
         val screen = ScrollView(this).apply {
             setBackgroundColor(dark)
@@ -80,7 +86,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             gravity = Gravity.CENTER
             setTypeface(null, Typeface.BOLD)
         })
-        body.addView(label("HYBRID ASSISTANT  •  v0.2", 12f, Color.LTGRAY).apply {
+        body.addView(label("HYBRID ASSISTANT  •  v0.3", 12f, Color.LTGRAY).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(5), 0, dp(28))
         })
@@ -133,6 +139,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         body.addView(button("➤  PARANCS KÜLDÉSE") { handle(input.text.toString()) },
             LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
 
+        body.addView(button("⚙  ONLINE AI BEÁLLÍTÁSA") { showAiSettings() },
+            LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(10) })
+
         body.addView(label("GYORS PARANCSOK", 12f, cyan).apply {
             setPadding(0, dp(24), 0, dp(8))
             setTypeface(null, Typeface.BOLD)
@@ -148,7 +157,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 })
         }
         body.addView(shortcuts)
-        body.addView(label("A beszédfelismerés a telefon szolgáltatását használja; internetet igényelhet. Az AI-csevegés később érkezik.", 12f, Color.LTGRAY).apply {
+        body.addView(label("Az alap parancsok offline működnek. Az AI-hoz internet és saját Gemini API-kulcs kell. A beszédfelismerés a telefon szolgáltatásától függ.", 12f, Color.LTGRAY).apply {
             setPadding(0, dp(20), 0, 0)
         })
         setContentView(screen)
@@ -214,7 +223,68 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 reply("Ma " + SimpleDateFormat("yyyy. MMMM d., EEEE", hu).format(Date()) + " van.")
             lower.contains("szia") || lower.contains("helló") ->
                 reply("Szia! JARVIS készen áll.")
-            else -> reply("Ezt a parancsot még nem ismerem. Az online AI egy későbbi verzióban érkezik.")
+            else -> askAi(command)
+        }
+    }
+
+    private fun showAiSettings() {
+        val field = EditText(this).apply {
+            hint = "Gemini API-kulcs (AI Studio)"
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            setPadding(dp(18), dp(14), dp(18), dp(14))
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("JARVIS online AI")
+            .setMessage("A kulcsot a telefon titkosítva tárolja. Ne add meg másnak. A Gemini szolgáltatása adatokat kap a kérdéseidből; a használat kvótás vagy fizetős lehet. A kulcsot a Google AI Studio felületén hozhatod létre.")
+            .setView(field)
+            .setPositiveButton("Mentés") { _, _ ->
+                try {
+                    val key = field.text.toString().trim()
+                    if (key.isBlank()) reply("Nem adtál meg kulcsot. A meglévő beállítás változatlan.")
+                    else {
+                        ai.saveKey(key)
+                        reply("AI-kulcs titkosítva elmentve. Most már kérdezhetsz.")
+                    }
+                } catch (_: Exception) {
+                    reply("Nem sikerült biztonságosan tárolni a kulcsot.")
+                }
+            }
+            .setNeutralButton("Kulcs törlése") { _, _ ->
+                ai.saveKey("")
+                reply("Az AI-kulcsot töröltem.")
+            }
+            .setNegativeButton("Mégse", null)
+            .create()
+        dialog.show()
+    }
+
+    private fun askAi(question: String) {
+        if (!ai.hasKey()) {
+            reply("Az online AI használatához először add meg a saját Gemini API-kulcsodat az AI beállításainál. Az offline parancsok addig is működnek.")
+            return
+        }
+        if (waitingForAi) {
+            status.text = "● AI VÁLASZRA VÁR"
+            return
+        }
+        waitingForAi = true
+        output.text = "JARVIS gondolkodik..."
+        status.text = "● ONLINE AI KÉRÉS"
+        executor.execute {
+            val answer = try {
+                ai.ask(question)
+            } catch (e: Exception) {
+                "Az online AI most nem elérhető. Ellenőrizd az internetet, a kulcsot és a kvótát. " +
+                    (e.message ?: "").take(160)
+            }
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) {
+                    waitingForAi = false
+                    reply(answer)
+                }
+            }
         }
     }
 
@@ -229,6 +299,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
+        executor.shutdownNow()
         tts?.stop()
         tts?.shutdown()
         super.onDestroy()
