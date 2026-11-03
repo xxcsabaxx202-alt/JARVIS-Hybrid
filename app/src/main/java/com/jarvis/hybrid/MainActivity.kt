@@ -389,8 +389,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             lower == "beszélgetési előzmények" || lower == "beszélgetés előzményei" ->
                 reply(memory.summary())
             lower == "töröld a beszélgetést" || lower == "felejtsd el a beszélgetést" -> {
-                memory.clear()
-                reply("A mentett AI-beszélgetést töröltem.")
+                AlertDialog.Builder(this).setTitle("Beszélgetés törlése")
+                    .setMessage("Biztosan törlöd a mentett beszélgetést?")
+                    .setPositiveButton("Törlés") { _, _ ->
+                        memory.clear()
+                        reply("A mentett AI-beszélgetést töröltem.")
+                    }
+                    .setNegativeButton("Mégse", null).show()
             }
             lower.contains("akkumulátor") || lower.contains("töltöttség") || lower.contains("akku") -> reply(batteryReport())
             lower == "rendszerdiagnosztika" || lower == "rendszer állapota" || lower == "telefon állapota" -> showDiagnostics()
