@@ -499,7 +499,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             "Android: " + Build.VERSION.RELEASE + "\\n" +
             "AI-kulcs: " + (if (ai.hasKey()) "beállítva" else "nincs beállítva") + "\\n" +
             "Beszédmotor: " + (activeTtsEngine ?: "alapértelmezett")
-        reply(report.replace("\\n", "\n"))
+        reply(report)
     }
 
     private fun webSearch(query: String) {
